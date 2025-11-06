@@ -13,109 +13,18 @@ describe('OtpService', () => {
   let service: OtpService;
   let visualizerService: RouteVisualizerService;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      imports: [HttpModule], // ✅ HttpService 의존성 해결
-      providers: [
-        OtpService, 
-        RouteVisualizerService, // ✅ 시각화 서비스 추가
-        PrismaService, 
-        ParticipantService,
-        { provide: JwtService, useValue: {} },
-        { provide: MapService, useValue: {} }, 
-      ], // ✅ PrismaService 주입
-    }).compile();
+  // 공통 시각화 생성 함수 (it 블록 밖, describe 스코프에 선언)
+  const createVisualization = async (
+    result: any,
+    fileName: string,
+    routeName: string,
+  ) => {
+    // result null/undefined 방어
+    if (!result || !result.plan) {
+      console.warn(`${routeName}: OTP 응답이 비어있습니다.`);
+      return;
+    }
 
-    service = module.get<OtpService>(OtpService);
-    visualizerService = module.get<RouteVisualizerService>(RouteVisualizerService);
-  });
-
-  // 🚇 대중교통 경로 테스트 (서울역 → 강남역)
-  it('should get transit route from Seoul Station to Gangnam Station', async () => {
-    console.log('\n🚇 === 대중교통 경로: 서울역 → 강남역 ===');
-    
-    const result = await service.getRoute(
-      '37.5563,126.9723',  // 서울역 좌표
-      '37.4979,127.0276',  // 강남역 좌표
-      'WALK,TRANSIT'
-    );
-    
-    await this.createVisualization(result, 'seoul-to-gangnam', '서울역-강남역');
-    expect(result).toBeDefined();
-  });
-
-  // 🚌 버스 중심 경로 테스트 (홍대 → 이대)
-  it('should get bus route from Hongik Univ to Ewha Univ', async () => {
-    console.log('\n🚌 === 버스 경로: 홍익대 → 이화여대 ===');
-    
-    const result = await service.getRoute(
-      '37.5511,126.9240',  // 홍익대 좌표
-      '37.5594,126.9467',  // 이화여대 좌표
-      'WALK,TRANSIT'
-    );
-    
-    await this.createVisualization(result, 'hongik-to-ewha', '홍익대-이화여대');
-    expect(result).toBeDefined();
-  });
-
-  // 🚶 도보 + 지하철 (잠실 → 코엑스)
-  it('should get route from Jamsil to COEX', async () => {
-    console.log('\n🚶🚇 === 도보+지하철: 잠실 → 코엑스 ===');
-    
-    const result = await service.getRoute(
-      '37.5134,127.1000',  // 잠실역 좌표
-      '37.5115,127.0595',  // 코엑스 좌표
-      'WALK,TRANSIT'
-    );
-    
-    await this.createVisualization(result, 'jamsil-to-coex', '잠실-코엑스');
-    expect(result).toBeDefined();
-  });
-
-  // 🌉 한강 건너는 경로 (여의도 → 강남)
-  it('should get route crossing Han River', async () => {
-    console.log('\n🌉 === 한강 횡단: 여의도 → 강남 ===');
-    
-    const result = await service.getRoute(
-      '37.5219,126.9245',  // 여의도 좌표
-      '37.4979,127.0276',  // 강남역 좌표
-      'WALK,TRANSIT'
-    );
-    
-    await this.createVisualization(result, 'yeouido-to-gangnam', '여의도-강남');
-    expect(result).toBeDefined();
-  });
-
-  // 🏢 비즈니스 구간 (을지로 → 종로)
-  it('should get route from Euljiro to Jongno', async () => {
-    console.log('\n🏢 === 도심 구간: 을지로 → 종로 ===');
-    
-    const result = await service.getRoute(
-      '37.5663,126.9916',  // 을지로3가 좌표
-      '37.5703,126.9924',  // 종로3가 좌표
-      'WALK,TRANSIT'
-    );
-    
-    await this.createVisualization(result, 'euljiro-to-jongno', '을지로-종로');
-    expect(result).toBeDefined();
-  });
-
-  // 🎓 대학가 경로 (신촌 → 대학로)
-  it('should get route from Sinchon to Daehangno', async () => {
-    console.log('\n🎓 === 대학가: 신촌 → 대학로 ===');
-    
-    const result = await service.getRoute(
-      '37.5584,126.9368',  // 신촌역 좌표
-      '37.5805,127.0021',  // 혜화역(대학로) 좌표
-      'WALK,TRANSIT'
-    );
-    
-    await this.createVisualization(result, 'sinchon-to-daehangno', '신촌-대학로');
-    expect(result).toBeDefined();
-  });
-
-  // 공통 시각화 생성 함수
-  async createVisualization(result: any, fileName: string, routeName: string) {
     console.log(`\n=== ${routeName} OTP API 응답 ===`);
     console.log(JSON.stringify(result, null, 2));
 
@@ -127,7 +36,7 @@ describe('OtpService', () => {
       // HTML 페이지 생성 및 파일 저장
       const htmlPage = visualizerService.generateHTMLPage(visualizationData);
       const outputPath = path.join(__dirname, '../../output');
-      
+
       // output 디렉토리가 없으면 생성
       if (!fs.existsSync(outputPath)) {
         fs.mkdirSync(outputPath, { recursive: true });
@@ -135,7 +44,7 @@ describe('OtpService', () => {
 
       const htmlFilePath = path.join(outputPath, `${fileName}.html`);
       fs.writeFileSync(htmlFilePath, htmlPage, 'utf8');
-      
+
       console.log(`\n=== ${routeName} HTML 파일 생성 완료 ===`);
       console.log(`파일 경로: ${htmlFilePath}`);
 
@@ -143,9 +52,93 @@ describe('OtpService', () => {
       const jsonFilePath = path.join(outputPath, `${fileName}-data.json`);
       fs.writeFileSync(jsonFilePath, JSON.stringify(visualizationData, null, 2), 'utf8');
       console.log(`JSON 데이터: ${jsonFilePath}`);
-
     } catch (error) {
       console.error(`${routeName} 시각화 처리 중 오류:`, error);
     }
-  }
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      imports: [HttpModule],
+      providers: [
+        OtpService,
+        RouteVisualizerService,
+        PrismaService,
+        ParticipantService,
+        { provide: JwtService, useValue: {} },
+        { provide: MapService, useValue: {} },
+      ],
+    }).compile();
+
+    service = module.get<OtpService>(OtpService);
+    visualizerService = module.get<RouteVisualizerService>(RouteVisualizerService);
+  });
+
+  // ts-jest hybrid module kind 경고 완화용 옵션 안내는 Jest 설정에서 처리 권장
+
+  it('🚇 서울역 → 강남역 (대중교통)', async () => {
+    const result = await service.getRoute(
+      '37.5563,126.9723', // 서울역
+      '37.4979,127.0276', // 강남역
+      'WALK,TRANSIT',
+    );
+
+    await createVisualization(result, 'seoul-to-gangnam', '서울역-강남역');
+    expect(result).toBeDefined();
+  });
+
+  it('🚌 홍익대 → 이화여대 (버스)', async () => {
+    const result = await service.getRoute(
+      '37.5511,126.9240', // 홍익대
+      '37.5594,126.9467', // 이화여대
+      'WALK,TRANSIT',
+    );
+
+    await createVisualization(result, 'hongik-to-ewha', '홍익대-이화여대');
+    expect(result).toBeDefined();
+  });
+
+  it('🚶🚇 잠실 → 코엑스 (도보+지하철)', async () => {
+    const result = await service.getRoute(
+      '37.5134,127.1000', // 잠실역
+      '37.5115,127.0595', // 코엑스
+      'WALK,TRANSIT',
+    );
+
+    await createVisualization(result, 'jamsil-to-coex', '잠실-코엑스');
+    expect(result).toBeDefined();
+  });
+
+  it('🌉 여의도 → 강남 (한강 횡단)', async () => {
+    const result = await service.getRoute(
+      '37.5219,126.9245', // 여의도
+      '37.4979,127.0276', // 강남역
+      'WALK,TRANSIT',
+    );
+
+    await createVisualization(result, 'yeouido-to-gangnam', '여의도-강남');
+    expect(result).toBeDefined();
+  });
+
+  it('🏢 을지로 → 종로 (도심)', async () => {
+    const result = await service.getRoute(
+      '37.5663,126.9916', // 을지로3가
+      '37.5703,126.9924', // 종로3가
+      'WALK,TRANSIT',
+    );
+
+    await createVisualization(result, 'euljiro-to-jongno', '을지로-종로');
+    expect(result).toBeDefined();
+  });
+
+  it('🎓 신촌 → 대학로 (대학가)', async () => {
+    const result = await service.getRoute(
+      '37.5584,126.9368', // 신촌역
+      '37.5805,127.0021', // 혜화역(대학로)
+      'WALK,TRANSIT',
+    );
+
+    await createVisualization(result, 'sinchon-to-daehangno', '신촌-대학로');
+    expect(result).toBeDefined();
+  });
 });
